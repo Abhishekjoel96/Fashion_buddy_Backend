@@ -9,9 +9,16 @@ const { errorHandler, notFound, requestLogger } = require('./middleware/errorHan
 // Initialize Express app
 const app = express();
 
+// CORS configuration for Vercel deployment
+const corsOptions = {
+  origin: 'https://fashion-buddy-chat.vercel.app',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'x-client-info', 'apikey']
+};
+
 // Apply global middleware
 app.use(helmet()); // Security headers
-app.use(cors()); // Enable CORS
+app.use(cors(corsOptions)); // Enable CORS with specific options
 app.use(compression()); // Compress responses
 app.use(express.json({ limit: '50mb' })); // Parse JSON request bodies
 app.use(express.urlencoded({ extended: true, limit: '50mb' })); // Parse URL-encoded request bodies
