@@ -61,9 +61,9 @@ const analyzeSkinTone = async (imageUrls) => {
 };
 
 /**
- * Process WhatsApp messages using GPT-4o with RAG
+ * Generate structured interactive responses for WhatsApp
  */
-const processWhatsAppMessage = async (message, sessionData) => {
+const generateInteractiveResponse = async (message, sessionData) => {
   try {
     // Format skin tone data for RAG
     const skinToneInfo = skinToneData.map(item => ({
@@ -85,6 +85,19 @@ const processWhatsAppMessage = async (message, sessionData) => {
         
         You have access to the following skin tone data for color recommendations:
         ${JSON.stringify(skinToneInfo.slice(0, 5))}... (and more)
+        
+        IMPORTANT FORMATTING INSTRUCTIONS:
+        - When you want to present interactive options to the user, use the special format:
+        [INTERACTIVE_OPTIONS]option1|option2|option3
+        
+        - When asking for a budget choice, use:
+        [INTERACTIVE_OPTIONS]₹500-₹1500 (Budget)|₹1500-₹3000 (Mid-range)|₹3000+ (Premium)
+        
+        - When asking for yes/no, use:
+        [INTERACTIVE_OPTIONS]Yes|No
+        
+        - For virtual try-on confirmation, use:
+        [INTERACTIVE_OPTIONS]Try on virtually|Get link to purchase|End session
         
         You should always be helpful, friendly, and conversational. Use emojis and keep messages concise for WhatsApp.
         Prices should be shown in Indian Rupees (₹).
@@ -126,9 +139,17 @@ const processWhatsAppMessage = async (message, sessionData) => {
       session_updates: detectSessionUpdates(response.choices[0].message.content)
     };
   } catch (error) {
-    console.error('Error processing WhatsApp message:', error);
+    console.error('Error generating interactive response:', error);
     throw error;
   }
+};
+
+/**
+ * Process WhatsApp messages using GPT-4o with RAG
+ */
+const processWhatsAppMessage = async (message, sessionData) => {
+  // Use the new interactive response generation
+  return generateInteractiveResponse(message, sessionData);
 };
 
 /**
@@ -154,5 +175,7 @@ const detectSessionUpdates = (message) => {
 
 module.exports = {
   analyzeSkinTone,
-  processWhatsAppMessage
+  processWhatsAppMessage,
+  generateInteractiveResponse,
+  detectSessionUpdates
 };
