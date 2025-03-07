@@ -1,54 +1,99 @@
-const { client, whatsappNumber } = require('../config/twilio');
-const userModel = require('../models/userModel');
-const sessionModel = require('../models/sessionModel');
-const { processWhatsAppMessage } = require('./aiService');
+// Add these new functions to whatsappService.js
 
 /**
- * Send a message to a WhatsApp number
+ * Send a WhatsApp message with interactive options
  */
-const sendWhatsAppMessage = async (to, message) => {
-  try {
-    // Format the number for WhatsApp (Twilio requires whatsapp: prefix)
-    const formattedNumber = formatWhatsAppNumber(to);
-    
-    const response = await client.messages.create({
-      from: `whatsapp:${whatsappNumber}`,
-      to: formattedNumber,
-      body: message
-    });
-    
-    return response;
-  } catch (error) {
-    console.error('Error sending WhatsApp message:', error);
-    throw error;
-  }
-};
-
-/**
- * Send an image to a WhatsApp number
- */
-const sendWhatsAppImage = async (to, imageUrl, caption = '') => {
+const sendWhatsAppInteractiveMessage = async (to, message, options) => {
   try {
     // Format the number for WhatsApp
     const formattedNumber = formatWhatsAppNumber(to);
     
+    // Format the message with options as a list
+    let formattedMessage = message + '\n\n';
+    
+    // Add options in a numbered list
+    options.forEach((option, index) => {
+      formattedMessage += `${index + 1}️⃣ ${option}\n`;
+    });
+    
     const response = await client.messages.create({
       from: `whatsapp:${whatsappNumber}`,
       to: formattedNumber,
-      body: caption,
-      mediaUrl: [imageUrl]
+      body: formattedMessage
     });
     
     return response;
   } catch (error) {
-    console.error('Error sending WhatsApp image:', error);
+    console.error('Error sending WhatsApp interactive message:', error);
     throw error;
   }
 };
 
 /**
- * Process incoming WhatsApp webhook
+ * Create a message with quick reply buttons as text
  */
+const createQuickReplyMessage = (message, quickReplies) => {
+  let fullMessage = message + '\n\n';
+  
+  // Add quick reply options
+  quickReplies.forEach((reply, index) => {
+    // Use emoji number indicators
+    const emoji = getNumberEmoji(index + 1);
+    fullMessage += `${emoji} ${reply}\n`;
+  });
+  
+  return fullMessage;
+};
+
+/**
+ * Get number emoji for options
+ */
+const getNumberEmoji = (number) => {
+  const numberEmojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+  
+  if (number >= 1 && number <= 10) {
+    return numberEmojis[number - 1];
+  }
+  
+  return number.toString();
+};
+
+// Update the initiateConversation function to use the new format
+
+const initiateConversation = async (phoneNumber, name = null) => {
+  try {
+    // Get or create user
+    let user = await userModel.getUserByPhone(phoneNumber);
+    
+    if (!user) {
+      user = await userModel.createUser(phoneNumber, name);
+    } else if (name && !user.name) {
+      // Update name if it wasn't set before
+      user = await userModel.updateUser(user.id, { name });
+    }
+    
+    // Create a new welcome session
+    const session = await sessionModel.createSession(user.id, 'welcome', 'active');
+    
+    // Send welcome message with interactive options
+    const welcomeMessage = `👋 Hello${name ? ' ' + name : ''}! Welcome to WhatsApp Fashion Buddy!\n\nI can help you find clothes that match your skin tone or try on clothes virtually. What would you like to do today?`;
+    
+    const options = [
+      'Color Analysis & Shopping Recommendations',
+      'Virtual Try-On'
+    ];
+    
+    await sendWhatsAppInteractiveMessage(phoneNumber, welcomeMessage, options);
+    
+    return { success: true, user, session };
+  } catch (error) {
+    console.error('Error initiating conversation:', error);
+    throw error;
+  }
+};
+
+// Update the processIncomingMessage function to recognize option selections
+
 const processIncomingMessage = async (body) => {
   try {
     // Extract message details from Twilio webhook
@@ -75,6 +120,28 @@ const processIncomingMessage = async (body) => {
       session = await sessionModel.createSession(user.id, 'new', 'active');
     }
     
+    // Check if this is a button selection (options are usually just numbers 1, 2, etc.)
+    const isOptionSelection = /^[1-9]$/.test(message.text.trim());
+    
+    // If this is an option selection, translate it to what the option means
+    if (isOptionSelection && message.type === 'text') {
+      const optionNumber = parseInt(message.text.trim());
+      
+      // Depending on the current session, map the number to an action
+      if (session.session_type === 'welcome' || session.session_type === 'new') {
+        if (optionNumber === 1) {
+          message.text = "I want Color Analysis & Shopping Recommendations";
+          message.isOptionSelection = true;
+          message.selectedOption = 1;
+        } else if (optionNumber === 2) {
+          message.text = "I want Virtual Try-On";
+          message.isOptionSelection = true;
+          message.selectedOption = 2;
+        }
+      }
+      // Add more mappings based on other session types and states
+    }
+    
     // Process message with AI
     const aiResponse = await processWhatsAppMessage(message, {
       session_type: session.session_type,
@@ -99,8 +166,22 @@ const processIncomingMessage = async (body) => {
       }
     }
     
-    // Send response back to user
-    await sendWhatsAppMessage(message.from, aiResponse.reply);
+    // Check if the AI's response should include interactive options
+    // This would require modifying the aiService to provide structured responses
+    let responseMessage = aiResponse.reply;
+    
+    // Example: if the reply contains special markers, convert them to interactive options
+    if (responseMessage.includes('[INTERACTIVE_OPTIONS]')) {
+      const parts = responseMessage.split('[INTERACTIVE_OPTIONS]');
+      const message = parts[0].trim();
+      const optionsStr = parts[1].trim();
+      const options = optionsStr.split('|').map(opt => opt.trim());
+      
+      await sendWhatsAppInteractiveMessage(message.from, message, options);
+    } else {
+      // Send regular response
+      await sendWhatsAppMessage(message.from, responseMessage);
+    }
     
     return { 
       success: true, 
@@ -114,87 +195,12 @@ const processIncomingMessage = async (body) => {
   }
 };
 
-/**
- * Extract message from Twilio webhook
- */
-const extractMessageFromTwilioWebhook = (body) => {
-  if (!body.From || !body.To) {
-    return null;
-  }
-  
-  // Strip 'whatsapp:' prefix
-  const from = body.From.replace('whatsapp:', '');
-  const to = body.To.replace('whatsapp:', '');
-  
-  // Determine message type and content
-  if (body.Body) {
-    return {
-      from,
-      to,
-      type: 'text',
-      text: body.Body
-    };
-  } else if (body.NumMedia && parseInt(body.NumMedia) > 0) {
-    return {
-      from,
-      to,
-      type: 'image',
-      imageUrl: body.MediaUrl0,
-      caption: body.Body || ''
-    };
-  }
-  
-  return null;
-};
-
-/**
- * Format WhatsApp number
- */
-const formatWhatsAppNumber = (number) => {
-  // Strip any non-numeric characters
-  const cleaned = number.replace(/\D/g, '');
-  
-  // Ensure it has the proper format
-  if (!cleaned.startsWith('whatsapp:')) {
-    return `whatsapp:${cleaned}`;
-  }
-  
-  return number;
-};
-
-/**
- * Initiate a conversation with a new client
- */
-const initiateConversation = async (phoneNumber, name = null) => {
-  try {
-    // Get or create user
-    let user = await userModel.getUserByPhone(phoneNumber);
-    
-    if (!user) {
-      user = await userModel.createUser(phoneNumber, name);
-    } else if (name && !user.name) {
-      // Update name if it wasn't set before
-      user = await userModel.updateUser(user.id, { name });
-    }
-    
-    // Create a new welcome session
-    const session = await sessionModel.createSession(user.id, 'welcome', 'active');
-    
-    // Send welcome message
-    const welcomeMessage = `👋 Hello${name ? ' ' + name : ''}! Welcome to WhatsApp Fashion Buddy!\n\nI can help you find clothes that match your skin tone or try on clothes virtually. What would you like to do today?\n\n1️⃣ Color Analysis & Shopping Recommendations\n2️⃣ Virtual Try-On\n\nReply with 1 or 2 to get started.`;
-    
-    await sendWhatsAppMessage(phoneNumber, welcomeMessage);
-    
-    return { success: true, user, session };
-  } catch (error) {
-    console.error('Error initiating conversation:', error);
-    throw error;
-  }
-};
-
+// Make sure to export the new functions
 module.exports = {
   sendWhatsAppMessage,
   sendWhatsAppImage,
+  sendWhatsAppInteractiveMessage,
+  createQuickReplyMessage,
   processIncomingMessage,
   initiateConversation
 };
