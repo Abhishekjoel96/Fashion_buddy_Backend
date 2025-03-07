@@ -1,4 +1,28 @@
-// Add these new functions to whatsappService.js
+const { client, whatsappNumber } = require('../config/twilio');
+const userModel = require('../models/userModel');
+const sessionModel = require('../models/sessionModel');
+const { processWhatsAppMessage } = require('./aiService');
+
+/**
+ * Send a message to a WhatsApp number
+ */
+const sendWhatsAppMessage = async (to, message) => {
+  try {
+    // Format the number for WhatsApp (Twilio requires whatsapp: prefix)
+    const formattedNumber = formatWhatsAppNumber(to);
+    
+    const response = await client.messages.create({
+      from: `whatsapp:${whatsappNumber}`,
+      to: formattedNumber,
+      body: message
+    });
+    
+    return response;
+  } catch (error) {
+    console.error('Error sending WhatsApp message:', error);
+    throw error;
+  }
+};
 
 /**
  * Send a WhatsApp message with interactive options
@@ -58,42 +82,31 @@ const getNumberEmoji = (number) => {
   return number.toString();
 };
 
-// Update the initiateConversation function to use the new format
-
-const initiateConversation = async (phoneNumber, name = null) => {
+/**
+ * Send an image to a WhatsApp number
+ */
+const sendWhatsAppImage = async (to, imageUrl, caption = '') => {
   try {
-    // Get or create user
-    let user = await userModel.getUserByPhone(phoneNumber);
+    // Format the number for WhatsApp
+    const formattedNumber = formatWhatsAppNumber(to);
     
-    if (!user) {
-      user = await userModel.createUser(phoneNumber, name);
-    } else if (name && !user.name) {
-      // Update name if it wasn't set before
-      user = await userModel.updateUser(user.id, { name });
-    }
+    const response = await client.messages.create({
+      from: `whatsapp:${whatsappNumber}`,
+      to: formattedNumber,
+      body: caption,
+      mediaUrl: [imageUrl]
+    });
     
-    // Create a new welcome session
-    const session = await sessionModel.createSession(user.id, 'welcome', 'active');
-    
-    // Send welcome message with interactive options
-    const welcomeMessage = `👋 Hello${name ? ' ' + name : ''}! Welcome to WhatsApp Fashion Buddy!\n\nI can help you find clothes that match your skin tone or try on clothes virtually. What would you like to do today?`;
-    
-    const options = [
-      'Color Analysis & Shopping Recommendations',
-      'Virtual Try-On'
-    ];
-    
-    await sendWhatsAppInteractiveMessage(phoneNumber, welcomeMessage, options);
-    
-    return { success: true, user, session };
+    return response;
   } catch (error) {
-    console.error('Error initiating conversation:', error);
+    console.error('Error sending WhatsApp image:', error);
     throw error;
   }
 };
 
-// Update the processIncomingMessage function to recognize option selections
-
+/**
+ * Process incoming WhatsApp webhook
+ */
 const processIncomingMessage = async (body) => {
   try {
     // Extract message details from Twilio webhook
@@ -138,6 +151,24 @@ const processIncomingMessage = async (body) => {
           message.isOptionSelection = true;
           message.selectedOption = 2;
         }
+      } else if (session.session_type === 'color_analysis') {
+        // Handle options for color analysis session
+        if (optionNumber === 1) {
+          message.text = "Budget range ₹500-₹1500";
+          message.isOptionSelection = true;
+          message.selectedOption = 1;
+        } else if (optionNumber === 2) {
+          message.text = "Budget range ₹1500-₹3000";
+          message.isOptionSelection = true;
+          message.selectedOption = 2;
+        } else if (optionNumber === 3) {
+          message.text = "Budget range ₹3000+";
+          message.isOptionSelection = true;
+          message.selectedOption = 3;
+        }
+      } else if (session.session_type === 'virtual_tryon') {
+        // Handle options for virtual try-on session
+        // Map numbers to product selection, confirmation, etc.
       }
       // Add more mappings based on other session types and states
     }
@@ -167,17 +198,16 @@ const processIncomingMessage = async (body) => {
     }
     
     // Check if the AI's response should include interactive options
-    // This would require modifying the aiService to provide structured responses
     let responseMessage = aiResponse.reply;
     
-    // Example: if the reply contains special markers, convert them to interactive options
+    // If the reply contains special markers, convert them to interactive options
     if (responseMessage.includes('[INTERACTIVE_OPTIONS]')) {
       const parts = responseMessage.split('[INTERACTIVE_OPTIONS]');
-      const message = parts[0].trim();
+      const messageContent = parts[0].trim();
       const optionsStr = parts[1].trim();
       const options = optionsStr.split('|').map(opt => opt.trim());
       
-      await sendWhatsAppInteractiveMessage(message.from, message, options);
+      await sendWhatsAppInteractiveMessage(message.from, messageContent, options);
     } else {
       // Send regular response
       await sendWhatsAppMessage(message.from, responseMessage);
@@ -195,12 +225,96 @@ const processIncomingMessage = async (body) => {
   }
 };
 
-// Make sure to export the new functions
+/**
+ * Extract message from Twilio webhook
+ */
+const extractMessageFromTwilioWebhook = (body) => {
+  if (!body.From || !body.To) {
+    return null;
+  }
+  
+  // Strip 'whatsapp:' prefix
+  const from = body.From.replace('whatsapp:', '');
+  const to = body.To.replace('whatsapp:', '');
+  
+  // Determine message type and content
+  if (body.Body) {
+    return {
+      from,
+      to,
+      type: 'text',
+      text: body.Body
+    };
+  } else if (body.NumMedia && parseInt(body.NumMedia) > 0) {
+    return {
+      from,
+      to,
+      type: 'image',
+      imageUrl: body.MediaUrl0,
+      caption: body.Body || ''
+    };
+  }
+  
+  return null;
+};
+
+/**
+ * Format WhatsApp number
+ */
+const formatWhatsAppNumber = (number) => {
+  // Strip any non-numeric characters
+  const cleaned = number.replace(/\D/g, '');
+  
+  // Ensure it has the proper format
+  if (!cleaned.startsWith('whatsapp:')) {
+    return `whatsapp:${cleaned}`;
+  }
+  
+  return number;
+};
+
+/**
+ * Initiate a conversation with a new client
+ */
+const initiateConversation = async (phoneNumber, name = null) => {
+  try {
+    // Get or create user
+    let user = await userModel.getUserByPhone(phoneNumber);
+    
+    if (!user) {
+      user = await userModel.createUser(phoneNumber, name);
+    } else if (name && !user.name) {
+      // Update name if it wasn't set before
+      user = await userModel.updateUser(user.id, { name });
+    }
+    
+    // Create a new welcome session
+    const session = await sessionModel.createSession(user.id, 'welcome', 'active');
+    
+    // Send welcome message with interactive options
+    const welcomeMessage = `👋 Hello${name ? ' ' + name : ''}! Welcome to WhatsApp Fashion Buddy!\n\nI can help you find clothes that match your skin tone or try on clothes virtually. What would you like to do today?`;
+    
+    const options = [
+      'Color Analysis & Shopping Recommendations',
+      'Virtual Try-On'
+    ];
+    
+    await sendWhatsAppInteractiveMessage(phoneNumber, welcomeMessage, options);
+    
+    return { success: true, user, session };
+  } catch (error) {
+    console.error('Error initiating conversation:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   sendWhatsAppMessage,
   sendWhatsAppImage,
   sendWhatsAppInteractiveMessage,
   createQuickReplyMessage,
   processIncomingMessage,
-  initiateConversation
+  initiateConversation,
+  formatWhatsAppNumber,
+  extractMessageFromTwilioWebhook
 };
