@@ -11,7 +11,7 @@ const app = express();
 
 // CORS configuration for Vercel deployment
 const corsOptions = {
-  origin: 'https://fashion-buddy-chat-jjalx6jip-abhisheks-projects-76c99680.vercel.app',
+  origin: 'https://fashion-buddy-chat.vercel.app/',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'x-client-info', 'apikey']
 };
