@@ -11,14 +11,21 @@ const app = express();
 
 // CORS configuration for Vercel deployment
 const corsOptions = {
-  origin: 'https://fashion-buddy-chat.vercel.app/',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'x-client-info', 'apikey']
+  origin: ['https://fashion-buddy-chat.vercel.app/'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'x-client-info', 'apikey'],
+  credentials: true,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 };
 
 // Apply global middleware
-app.use(helmet()); // Security headers
+app.use(helmet()); 
 app.use(cors(corsOptions)); // Enable CORS with specific options
+
+// Handle preflight requests before other middleware
+app.options('*', cors(corsOptions));
+
 app.use(compression()); // Compress responses
 app.use(express.json({ limit: '50mb' })); // Parse JSON request bodies
 app.use(express.urlencoded({ extended: true, limit: '50mb' })); // Parse URL-encoded request bodies
