@@ -17,16 +17,11 @@ app.post('/', authenticateAdmin, validateFields(['phone_number']), clientControl
 app.put('/:id', authenticateAdmin, clientController.updateClient);
 app.delete('/:id', authenticateAdmin, clientController.deleteClient);
 
-// For Vercel - main handler function
 module.exports = (req, res) => {
-  // Handle OPTIONS directly for preflight requests
   if (req.method === 'OPTIONS') {
-    // Send correct headers and status 204
     res.writeHead(204, corsHeaders);
     res.end();
     return;
   }
-  
-  // Forward to Express app for non-OPTIONS requests
   app(req, res);
 };
