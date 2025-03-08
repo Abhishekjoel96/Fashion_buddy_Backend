@@ -2,6 +2,11 @@
  * Simple authentication middleware for admin routes
  */
 const authenticateAdmin = (req, res, next) => {
+    // Skip authentication for OPTIONS requests (CORS preflight)
+    if (req.method === 'OPTIONS') {
+      return next();
+    }
+
     // Check for API key in headers
     const apiKey = req.headers['x-api-key'];
     
@@ -20,6 +25,11 @@ const authenticateAdmin = (req, res, next) => {
    */
   const validateFields = (requiredFields) => {
     return (req, res, next) => {
+      // Skip validation for OPTIONS requests
+      if (req.method === 'OPTIONS') {
+        return next();
+      }
+
       const missingFields = [];
       
       for (const field of requiredFields) {
