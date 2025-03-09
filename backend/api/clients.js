@@ -1,4 +1,4 @@
-// Use consistent module system (CommonJS)
+// backend/api/clients.js
 const express = require('express');
 const app = express();
 const clientController = require('../src/controllers/clientController');
