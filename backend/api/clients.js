@@ -16,7 +16,13 @@ app.post('/', authenticateAdmin, validateFields(['phone_number']), clientControl
 app.put('/:id', authenticateAdmin, clientController.updateClient);
 app.delete('/:id', authenticateAdmin, clientController.deleteClient);
 
-// Export for Vercel
+// Export for Vercel - Add OPTIONS handling
 module.exports = (req, res) => {
-  app(req, res);
+  // CRITICAL FIX: Handle OPTIONS requests
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, corsHeaders);
+    res.end();
+    return;
+  }
+  app(req, res);
 };
