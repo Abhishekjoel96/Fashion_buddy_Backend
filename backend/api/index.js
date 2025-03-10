@@ -35,6 +35,7 @@ app.use(errorHandler);
 // Export for Vercel
 module.exports = (req, res) => {
   if (req.method === 'OPTIONS') {
+    // CORS handling
     res.setHeader('Access-Control-Allow-Origin', 'https://fashion-buddy-chat.vercel.app');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key');
