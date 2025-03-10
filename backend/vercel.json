@@ -1,25 +1,27 @@
+// backend/vercel.json
 {
-    "version": 2,
-    "builds": [
-        { "src": "api/**/*.js", "use": "@vercel/node" }
-    ],
-    "routes": [
-        { "src": "/api/(.*)", "dest": "/api/$1" }
-    ],
-    "headers": [
-        {
-            "source": "/(.*)",
-            "headers": [
-                { "key": "Access-Control-Allow-Origin", "value": "https://fashion-buddy-chat.vercel.app" },
-                { "key": "Access-Control-Allow-Methods", "value": "GET, POST, PUT, DELETE, OPTIONS" },
-                { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization, x-api-key" }
-            ]
-        }
-    ],
-    "crons": [
-        {
-            "path": "/api/cleanup.js",
-            "schedule": "0 * * * *"
-        }
-    ]
+  "version": 2,
+  "builds": [
+    { "src": "api/**/*.js", "use": "@vercel/node" }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/$1" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "https://fashion-buddy-chat.vercel.app" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, PUT, DELETE, OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization, x-api-key" },
+        { "key": "Access-Control-Max-Age", "value": "86400" }
+      ]
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cleanup.js",
+      "schedule": "0 * * * *"
+    }
+  ]
 }
