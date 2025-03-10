@@ -1,9 +1,9 @@
 // backend/api/clients.js
+require('dotenv').config();
 const express = require('express');
 const app = express();
 const clientController = require('../src/controllers/clientController');
 const { authenticateAdmin, validateFields } = require('../src/middleware/auth');
-const { corsHeaders } = require('./_shared/cors');
 
 // Middleware
 app.use(express.json());
@@ -16,12 +16,14 @@ app.post('/', authenticateAdmin, validateFields(['phone_number']), clientControl
 app.put('/:id', authenticateAdmin, clientController.updateClient);
 app.delete('/:id', authenticateAdmin, clientController.deleteClient);
 
-// Export for Vercel - Add OPTIONS handling
+// Export for Vercel
 module.exports = (req, res) => {
-  // CRITICAL FIX: Handle OPTIONS requests
   if (req.method === 'OPTIONS') {
-    res.writeHead(204, corsHeaders);
-    res.end();
+    res.setHeader('Access-Control-Allow-Origin', 'https://fashion-buddy-chat.vercel.app');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key');
+    res.setHeader('Access-Control-Max-Age', '86400');
+    res.status(204).end();
     return;
   }
   app(req, res);
