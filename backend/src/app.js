@@ -11,16 +11,18 @@ const app = express();
 
 // Apply global middleware
 app.use(helmet()); // Security headers
-app.use(cors()); // Enable CORS
+app.use(cors({
+  origin: 'https://fashion-buddy-chat.vercel.app' // ADD THIS LINE: your frontend URL
+})); // Enable CORS for specific origin
 app.use(compression()); // Compress responses
 app.use(express.json({ limit: '50mb' })); // Parse JSON request bodies
 app.use(express.urlencoded({ extended: true, limit: '50mb' })); // Parse URL-encoded request bodies
 
 // Request logging
 if (process.env.NODE_ENV === 'development') {
-  app.use(morgan('dev')); // Detailed logger for development
+  app.use(morgan('dev')); // Detailed logger for development
 } else {
-  app.use(morgan('combined')); // Standard Apache combined log format for production
+  app.use(morgan('combined')); // Standard Apache combined log format for production
 }
 
 // Custom request logger
@@ -28,12 +30,12 @@ app.use(requestLogger);
 
 // Root route
 app.get('/', (req, res) => {
-  res.status(200).json({
-    message: 'WhatsApp AI Fashion Buddy API',
-    status: 'active',
-    version: '1.0.0',
-    documentation: '/api-docs'
-  });
+  res.status(200).json({
+    message: 'WhatsApp AI Fashion Buddy API',
+    status: 'active',
+    version: '1.0.0',
+    documentation: '/api-docs'
+  });
 });
 
 // Mount API routes
