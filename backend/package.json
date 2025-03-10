@@ -5,6 +5,7 @@
     "scripts": {
       "dev": "vercel dev",
       "deploy": "vercel deploy --prod"
+      "vercel-build": "echo 'Build step'"
     },
     "keywords": [
       "whatsapp",
